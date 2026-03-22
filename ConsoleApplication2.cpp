@@ -2,7 +2,7 @@
 // Written by <INSERT YOUR FULL NAME> <INSERT YOUR ZID> on <INSERT DATE>
 //
 // Description: CS Chicken implementation up to Stage 2.2
-#define _CRT_SECURE_NO_WARNINGS
+
 // Provided Libraries
 #include <stdio.h>
 
@@ -17,7 +17,7 @@
 #define DEFAULT_POINT_TARGET 20
 
 // Add your own #define constants below this line
-
+#define _CRT_SECURE_NO_WARNINGS
 // Provided Enums
 // Enum for features on the game board
 enum entity {
@@ -123,6 +123,31 @@ int process_player_move(
     int *player_col,
     char command
 );
+void update_destination_from_command(
+    char command,
+    int *destination_row,
+    int *destination_col
+);
+int is_valid_player_destination(
+    struct tile board[ROWS][COLS],
+    int row,
+    int col
+);
+int is_gameplay_move_command(char command);
+void collect_coin(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int *score,
+    int *coins_collected
+);
+void handle_road_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+);
+void handle_car_setup_command(struct tile board[ROWS][COLS]);
+void handle_target_setup_command(int *target_score);
 int process_gameplay_turn(
     struct tile board[ROWS][COLS],
     int *player_row,
@@ -203,12 +228,6 @@ int process_setup_command(
     int *target_score,
     char command
 ) {
-    int row;
-    int col;
-    int deforesting;
-    char direction;
-    int points;
-
     if (command == 'c') {
         place_basic_feature(board, player_row, player_col, COIN);
         return 1;
@@ -218,43 +237,15 @@ int process_setup_command(
         return 1;
     }
     if (command == 'r') {
-        if (scanf("%d", &row) == 1) {
-            if (!is_position_on_board(row, 0)) {
-                printf("Invalid location: position is not on map!\n");
-            } else if (!can_build_road(
-                           board, player_row, player_col, row, &deforesting
-                       )) {
-                printf("Invalid location: road cannot be built.\n");
-            } else {
-                if (deforesting) {
-                    printf("Deforesting.\n");
-                }
-                build_road(board, row);
-            }
-        }
+        handle_road_setup_command(board, player_row, player_col);
         return 1;
     }
     if (command == 'v') {
-        if (scanf("%d %d %c", &row, &col, &direction) == 3) {
-            if (!is_position_on_board(row, col)) {
-                printf("Invalid location: position is not on map!\n");
-            } else if (board[row][col].entity != ROAD
-                       && board[row][col].entity != HEADLIGHTS) {
-                printf("Invalid location: car must be on a road.\n");
-            } else {
-                place_car(board, row, col, direction);
-            }
-        }
+        handle_car_setup_command(board);
         return 1;
     }
     if (command == 'x') {
-        if (scanf("%d", &points) == 1) {
-            if (points < 1 || points > 99) {
-                printf("Target must be between 1 and 99 inclusive.\n");
-            } else {
-                *target_score = points;
-            }
-        }
+        handle_target_setup_command(target_score);
         return 1;
     }
 
@@ -329,8 +320,7 @@ int process_gameplay_turn(
         return 0;
     }
 
-    if (command != 'w' && command != 'a' && command != 's'
-        && command != 'd' && command != 'R') {
+    if (!is_gameplay_move_command(command)) {
         return 0;
     }
 
@@ -345,10 +335,14 @@ int process_gameplay_turn(
         );
         *step_count += successful_move;
 
-        if (successful_move && board[*player_row][*player_col].entity == COIN) {
-            board[*player_row][*player_col].entity = EMPTY;
-            *score += 5;
-            (*coins_collected)++;
+        if (successful_move) {
+            collect_coin(
+                board,
+                *player_row,
+                *player_col,
+                score,
+                coins_collected
+            );
         }
     }
 
@@ -375,34 +369,69 @@ int process_player_move(
     int *player_col,
     char command
 ) {
-    int new_row = *player_row;
-    int new_col = *player_col;
+    int destination_row = *player_row;
+    int destination_col = *player_col;
 
     if (command == 'R') {
         return 1;
     }
-    if (command == 'w') {
-        new_row--;
-    } else if (command == 'a') {
-        new_col--;
-    } else if (command == 's') {
-        new_row++;
-    } else if (command == 'd') {
-        new_col++;
-    } else {
+    if (!is_gameplay_move_command(command)) {
         return 0;
     }
 
-    if (!is_position_on_board(new_row, new_col)) {
-        return 0;
-    }
-    if (board[new_row][new_col].entity == TREE) {
+    update_destination_from_command(command, &destination_row, &destination_col);
+
+    if (!is_valid_player_destination(board, destination_row, destination_col)) {
         return 0;
     }
 
-    *player_row = new_row;
-    *player_col = new_col;
+    *player_row = destination_row;
+    *player_col = destination_col;
     return 1;
+}
+
+void update_destination_from_command(
+    char command,
+    int *destination_row,
+    int *destination_col
+) {
+    if (command == 'w') {
+        (*destination_row)--;
+    } else if (command == 'a') {
+        (*destination_col)--;
+    } else if (command == 's') {
+        (*destination_row)++;
+    } else if (command == 'd') {
+        (*destination_col)++;
+    }
+}
+
+int is_valid_player_destination(
+    struct tile board[ROWS][COLS],
+    int row,
+    int col
+) {
+    return is_position_on_board(row, col)
+        && board[row][col].entity != TREE;
+}
+
+int is_gameplay_move_command(char command) {
+    return command == 'w' || command == 'a' || command == 's'
+        || command == 'd' || command == 'R';
+}
+
+void collect_coin(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int *score,
+    int *coins_collected
+) {
+    if (board[player_row][player_col].entity == COIN) {
+        board[player_row][player_col].entity = EMPTY;
+        *score += 5;
+        (*coins_collected)++;
+    }
 }
 
 int is_position_on_board(int row, int col) {
@@ -438,6 +467,65 @@ void place_basic_feature(
             board[row][col].entity = feature;
         }
     }
+}
+
+void handle_road_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+) {
+    int row;
+    int deforesting;
+
+    if (scanf("%d", &row) != 1) {
+        return;
+    }
+    if (!is_position_on_board(row, 0)) {
+        printf("Invalid location: position is not on map!\n");
+        return;
+    }
+    if (!can_build_road(board, player_row, player_col, row, &deforesting)) {
+        printf("Invalid location: road cannot be built.\n");
+        return;
+    }
+    if (deforesting) {
+        printf("Deforesting.\n");
+    }
+    build_road(board, row);
+}
+
+void handle_car_setup_command(struct tile board[ROWS][COLS]) {
+    int row;
+    int col;
+    char direction;
+
+    if (scanf("%d %d %c", &row, &col, &direction) != 3) {
+        return;
+    }
+    if (!is_position_on_board(row, col)) {
+        printf("Invalid location: position is not on map!\n");
+        return;
+    }
+    if (board[row][col].entity != ROAD && board[row][col].entity != HEADLIGHTS) {
+        printf("Invalid location: car must be on a road.\n");
+        return;
+    }
+
+    place_car(board, row, col, direction);
+}
+
+void handle_target_setup_command(int *target_score) {
+    int points;
+
+    if (scanf("%d", &points) != 1) {
+        return;
+    }
+    if (points < 1 || points > 99) {
+        printf("Target must be between 1 and 99 inclusive.\n");
+        return;
+    }
+
+    *target_score = points;
 }
 
 int can_build_road(
