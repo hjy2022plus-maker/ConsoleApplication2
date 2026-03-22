@@ -148,6 +148,13 @@ void handle_road_setup_command(
 );
 void handle_car_setup_command(struct tile board[ROWS][COLS]);
 void handle_target_setup_command(int *target_score);
+int dispatch_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int *target_score,
+    char command
+);
 int process_gameplay_turn(
     struct tile board[ROWS][COLS],
     int *player_row,
@@ -158,6 +165,32 @@ int process_gameplay_turn(
     int *step_count,
     int *coins_collected,
     char command
+);
+int handle_gameplay_status_command(
+    int turns_taken,
+    int step_count,
+    int coins_collected,
+    int score,
+    char command
+);
+void apply_gameplay_move(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *step_count,
+    int *coins_collected,
+    char command
+);
+int finish_gameplay_turn(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
 );
 
 // Provided sample main() function (you will need to modify this)
@@ -228,28 +261,13 @@ int process_setup_command(
     int *target_score,
     char command
 ) {
-    if (command == 'c') {
-        place_basic_feature(board, player_row, player_col, COIN);
-        return 1;
-    }
-    if (command == 't') {
-        place_basic_feature(board, player_row, player_col, TREE);
-        return 1;
-    }
-    if (command == 'r') {
-        handle_road_setup_command(board, player_row, player_col);
-        return 1;
-    }
-    if (command == 'v') {
-        handle_car_setup_command(board);
-        return 1;
-    }
-    if (command == 'x') {
-        handle_target_setup_command(target_score);
-        return 1;
-    }
-
-    return 0;
+    return dispatch_setup_command(
+        board,
+        player_row,
+        player_col,
+        target_score,
+        command
+    );
 }
 
 void start_gameplay_phase(
@@ -303,64 +321,39 @@ int process_gameplay_turn(
     int *coins_collected,
     char command
 ) {
-    int successful_move = 0;
-
-    if (command == 'q') {
-        printf("============= Quitting Game =============\n");
-        return 1;
-    }
-
-    if (command == 'p') {
-        print_game_statistics(
+    if (handle_gameplay_status_command(
             *turns_taken,
             *step_count,
             *coins_collected,
-            *score
-        );
-        return 0;
+            *score,
+            command
+        )) {
+        return 1;
     }
-
     if (!is_gameplay_move_command(command)) {
         return 0;
     }
 
     (*turns_taken)++;
-
-    if (command != 'R') {
-        successful_move = process_player_move(
-            board,
-            player_row,
-            player_col,
-            command
-        );
-        *step_count += successful_move;
-
-        if (successful_move) {
-            collect_coin(
-                board,
-                *player_row,
-                *player_col,
-                score,
-                coins_collected
-            );
-        }
-    }
-
-    if (*score >= target_score) {
-        print_board(board, *player_row, *player_col, *score, target_score);
-        print_game_statistics(
-            *turns_taken,
-            *step_count,
-            *coins_collected,
-            *score
-        );
-        print_game_won();
-        return 1;
-    }
-
-    print_board(board, *player_row, *player_col, *score, target_score);
-
-    return 0;
+    apply_gameplay_move(
+        board,
+        player_row,
+        player_col,
+        score,
+        step_count,
+        coins_collected,
+        command
+    );
+    return finish_gameplay_turn(
+        board,
+        *player_row,
+        *player_col,
+        *score,
+        target_score,
+        *turns_taken,
+        *step_count,
+        *coins_collected
+    );
 }
 
 int process_player_move(
@@ -526,6 +519,94 @@ void handle_target_setup_command(int *target_score) {
     }
 
     *target_score = points;
+}
+
+int dispatch_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int *target_score,
+    char command
+) {
+    if (command == 'c' || command == 't') {
+        place_basic_feature(
+            board,
+            player_row,
+            player_col,
+            command == 'c' ? COIN : TREE
+        );
+        return 1;
+    }
+    if (command == 'r') {
+        handle_road_setup_command(board, player_row, player_col);
+        return 1;
+    }
+    if (command == 'v') {
+        handle_car_setup_command(board);
+        return 1;
+    }
+    if (command == 'x') {
+        handle_target_setup_command(target_score);
+        return 1;
+    }
+    return 0;
+}
+
+int handle_gameplay_status_command(
+    int turns_taken,
+    int step_count,
+    int coins_collected,
+    int score,
+    char command
+) {
+    if (command == 'q') {
+        printf("============= Quitting Game =============\n");
+        return 1;
+    }
+    if (command == 'p') {
+        print_game_statistics(turns_taken, step_count, coins_collected, score);
+    }
+    return command == 'p';
+}
+
+void apply_gameplay_move(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *step_count,
+    int *coins_collected,
+    char command
+) {
+    int successful_move;
+
+    if (command == 'R') {
+        return;
+    }
+    successful_move = process_player_move(board, player_row, player_col, command);
+    *step_count += successful_move;
+    if (successful_move) {
+        collect_coin(board, *player_row, *player_col, score, coins_collected);
+    }
+}
+
+int finish_gameplay_turn(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
+) {
+    print_board(board, player_row, player_col, score, target_score);
+    if (score < target_score) {
+        return 0;
+    }
+    print_game_statistics(turns_taken, step_count, coins_collected, score);
+    print_game_won();
+    return 1;
 }
 
 int can_build_road(
