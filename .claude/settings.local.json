@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(g++ -Werror ConsoleApplication2.cpp -o cs_chicken 2>&1)",
-      "Bash(./cs_chicken)"
-    ]
-  }
-}
