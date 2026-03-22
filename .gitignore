@@ -1,0 +1,13 @@
+.vs/
+x64/
+*.exe
+*.pdb
+*.ilk
+*.idb
+*.obj
+*.log
+*.recipe
+*.tlog
+*.lastbuildstate
+*.vcxproj.user
+ConsoleA.bba900a9/
