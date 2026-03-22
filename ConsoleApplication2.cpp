@@ -387,7 +387,11 @@ int process_player_move(
         return 0;
     }
 
-    update_destination_from_command(command, &destination_row, &destination_col);
+    update_destination_from_command(
+        command,
+        &destination_row,
+        &destination_col
+    );
 
     if (!is_valid_player_destination(board, destination_row, destination_col)) {
         return 0;
@@ -514,7 +518,8 @@ void handle_car_setup_command(struct tile board[ROWS][COLS]) {
         printf("Invalid location: position is not on map!\n");
         return;
     }
-    if (board[row][col].entity != ROAD && board[row][col].entity != HEADLIGHTS) {
+    if (board[row][col].entity != ROAD
+        && board[row][col].entity != HEADLIGHTS) {
         printf("Invalid location: car must be on a road.\n");
         return;
     }
@@ -598,7 +603,12 @@ void apply_gameplay_move(
     if (command == 'R') {
         return;
     }
-    successful_move = process_player_move(board, player_row, player_col, command);
+    successful_move = process_player_move(
+        board,
+        player_row,
+        player_col,
+        command
+    );
     *step_count += successful_move;
     if (successful_move) {
         collect_coin(board, *player_row, *player_col, score, coins_collected);
