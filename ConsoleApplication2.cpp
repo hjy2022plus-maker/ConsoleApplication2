@@ -192,6 +192,21 @@ int finish_gameplay_turn(
     int step_count,
     int coins_collected
 );
+int is_player_shocked(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+);
+int handle_collision(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
+);
 
 // Provided sample main() function (you will need to modify this)
 int main(void) {
@@ -600,12 +615,59 @@ int finish_gameplay_turn(
     int step_count,
     int coins_collected
 ) {
+    if (handle_collision(
+            board,
+            player_row,
+            player_col,
+            score,
+            target_score,
+            turns_taken,
+            step_count,
+            coins_collected
+        )) {
+        return 1;
+    }
+
     print_board(board, player_row, player_col, score, target_score);
     if (score < target_score) {
         return 0;
     }
     print_game_statistics(turns_taken, step_count, coins_collected, score);
     print_game_won();
+    return 1;
+}
+
+int is_player_shocked(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+) {
+    enum entity tile = board[player_row][player_col].entity;
+
+    return tile == HEADLIGHTS
+        || tile == CAR_FACING_LEFT
+        || tile == CAR_FACING_RIGHT;
+}
+
+int handle_collision(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
+) {
+    enum entity tile = board[player_row][player_col].entity;
+
+    if (tile != CAR_FACING_LEFT && tile != CAR_FACING_RIGHT) {
+        return 0;
+    }
+
+    print_board(board, player_row, player_col, score, target_score);
+    print_game_statistics(turns_taken, step_count, coins_collected, score);
+    print_game_lost();
     return 1;
 }
 
@@ -707,7 +769,11 @@ void print_board(
         for (int col = 0; col < COLS; col++) {
             printf("|");
             if (row == player_row && col == player_col) {
-                printf("^_^");
+                if (is_player_shocked(board, player_row, player_col)) {
+                    printf("0_0");
+                } else {
+                    printf("^_^");
+                }
             } else if (board[row][col].entity == EMPTY) {
                 printf("   ");
             } else if (board[row][col].entity == COIN) {
