@@ -100,6 +100,7 @@ int process_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *target_score,
     char command
 );
 void start_gameplay_phase(
@@ -157,7 +158,13 @@ int main(void) {
     printf("Enter setup commands:\n");
 
     while (scanf(" %c", &command) == 1 && command != 'e') {
-        process_setup_command(board, player_row, player_col, command);
+        process_setup_command(
+            board,
+            player_row,
+            player_col,
+            &target_score,
+            command
+        );
     }
 
     start_gameplay_phase(board, player_row, player_col, score, target_score);
@@ -193,12 +200,14 @@ int process_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *target_score,
     char command
 ) {
     int row;
     int col;
     int deforesting;
     char direction;
+    int points;
 
     if (command == 'c') {
         place_basic_feature(board, player_row, player_col, COIN);
@@ -234,6 +243,16 @@ int process_setup_command(
                 printf("Invalid location: car must be on a road.\n");
             } else {
                 place_car(board, row, col, direction);
+            }
+        }
+        return 1;
+    }
+    if (command == 'x') {
+        if (scanf("%d", &points) == 1) {
+            if (points < 1 || points > 99) {
+                printf("Target must be between 1 and 99 inclusive.\n");
+            } else {
+                *target_score = points;
             }
         }
         return 1;
@@ -333,9 +352,8 @@ int process_gameplay_turn(
         }
     }
 
-    print_board(board, *player_row, *player_col, *score, target_score);
-
     if (*score >= target_score) {
+        print_board(board, *player_row, *player_col, *score, target_score);
         print_game_statistics(
             *turns_taken,
             *step_count,
@@ -345,6 +363,8 @@ int process_gameplay_turn(
         print_game_won();
         return 1;
     }
+
+    print_board(board, *player_row, *player_col, *score, target_score);
 
     return 0;
 }
