@@ -34,6 +34,10 @@ enum entity {
 };
 
 // Add your own enums below this line
+enum game_mode {
+    STATIC_MODE,
+    DRIVING_MODE
+};
 
 // Represents a tile on the board (you may edit this and add your own fields)
 struct tile {
@@ -115,7 +119,8 @@ void process_gameplay_phase(
     int *player_row,
     int *player_col,
     int *score,
-    int target_score
+    int target_score,
+    enum game_mode mode
 );
 int process_player_move(
     struct tile board[ROWS][COLS],
@@ -156,6 +161,17 @@ int dispatch_setup_command(
     char command
 );
 int process_gameplay_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    char command
+);
+int process_driving_turn(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
@@ -207,6 +223,22 @@ int handle_collision(
     int step_count,
     int coins_collected
 );
+int is_valid_car_destination(
+    struct tile board[ROWS][COLS],
+    int row,
+    int col
+);
+void clear_headlights(struct tile board[ROWS][COLS]);
+void refresh_headlights(struct tile board[ROWS][COLS]);
+void process_left_facing_cars(
+    struct tile board[ROWS][COLS],
+    int moved[ROWS][COLS]
+);
+void process_right_facing_cars(
+    struct tile board[ROWS][COLS],
+    int moved[ROWS][COLS]
+);
+void run_car_turn(struct tile board[ROWS][COLS]);
 
 // Provided sample main() function (you will need to modify this)
 int main(void) {
@@ -215,6 +247,7 @@ int main(void) {
     int player_col = INVALID_COL;
     int score = INITIAL_POINTS;
     int target_score = DEFAULT_POINT_TARGET;
+    enum game_mode mode = STATIC_MODE;
     char command;
 
     print_welcome();
@@ -230,7 +263,14 @@ int main(void) {
     print_board(board, player_row, player_col, score, target_score);
     printf("Enter setup commands:\n");
 
-    while (scanf(" %c", &command) == 1 && command != 'e') {
+    while (scanf(" %c", &command) == 1) {
+        if (command == 'e') {
+            break;
+        }
+        if (command == 'd') {
+            mode = DRIVING_MODE;
+            break;
+        }
         process_setup_command(
             board,
             player_row,
@@ -240,13 +280,20 @@ int main(void) {
         );
     }
 
-    start_gameplay_phase(board, player_row, player_col, score, target_score);
+    start_gameplay_phase(
+        board,
+        player_row,
+        player_col,
+        score,
+        target_score
+    );
     process_gameplay_phase(
         board,
         &player_row,
         &player_col,
         &score,
-        target_score
+        target_score,
+        mode
     );
 
     return 0;
@@ -301,7 +348,8 @@ void process_gameplay_phase(
     int *player_row,
     int *player_col,
     int *score,
-    int target_score
+    int target_score,
+    enum game_mode mode
 ) {
     int turns_taken = 0;
     int step_count = 0;
@@ -309,7 +357,10 @@ void process_gameplay_phase(
     char command;
 
     while (scanf(" %c", &command) == 1) {
-        if (process_gameplay_turn(
+        int game_over = 0;
+
+        if (mode == DRIVING_MODE) {
+            game_over = process_driving_turn(
                 board,
                 player_row,
                 player_col,
@@ -319,7 +370,22 @@ void process_gameplay_phase(
                 &step_count,
                 &coins_collected,
                 command
-            )) {
+            );
+        } else {
+            game_over = process_gameplay_turn(
+                board,
+                player_row,
+                player_col,
+                score,
+                target_score,
+                &turns_taken,
+                &step_count,
+                &coins_collected,
+                command
+            );
+        }
+
+        if (game_over) {
             return;
         }
     }
@@ -359,6 +425,77 @@ int process_gameplay_turn(
         coins_collected,
         command
     );
+    return finish_gameplay_turn(
+        board,
+        *player_row,
+        *player_col,
+        *score,
+        target_score,
+        *turns_taken,
+        *step_count,
+        *coins_collected
+    );
+}
+
+int process_driving_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    char command
+) {
+    if (handle_gameplay_status_command(
+            *turns_taken,
+            *step_count,
+            *coins_collected,
+            *score,
+            command
+        )) {
+        return 1;
+    }
+    if (!is_gameplay_move_command(command)) {
+        return 0;
+    }
+
+    (*turns_taken)++;
+    apply_gameplay_move(
+        board,
+        player_row,
+        player_col,
+        score,
+        step_count,
+        coins_collected,
+        command
+    );
+    if (handle_collision(
+            board,
+            *player_row,
+            *player_col,
+            *score,
+            target_score,
+            *turns_taken,
+            *step_count,
+            *coins_collected
+        )) {
+        return 1;
+    }
+    if (*score >= target_score) {
+        print_board(board, *player_row, *player_col, *score, target_score);
+        print_game_statistics(
+            *turns_taken,
+            *step_count,
+            *coins_collected,
+            *score
+        );
+        print_game_won();
+        return 1;
+    }
+
+    run_car_turn(board);
     return finish_gameplay_turn(
         board,
         *player_row,
@@ -585,8 +722,9 @@ int handle_gameplay_status_command(
     }
     if (command == 'p') {
         print_game_statistics(turns_taken, step_count, coins_collected, score);
+        return 0;
     }
-    return command == 'p';
+    return 0;
 }
 
 void apply_gameplay_move(
@@ -679,6 +817,97 @@ int handle_collision(
     print_game_statistics(turns_taken, step_count, coins_collected, score);
     print_game_lost();
     return 1;
+}
+
+int is_valid_car_destination(
+    struct tile board[ROWS][COLS],
+    int row,
+    int col
+) {
+    if (!is_position_on_board(row, col)) {
+        return 0;
+    }
+
+    return board[row][col].entity == ROAD
+        || board[row][col].entity == HEADLIGHTS;
+}
+
+void clear_headlights(struct tile board[ROWS][COLS]) {
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLS; col++) {
+            if (board[row][col].entity == HEADLIGHTS) {
+                board[row][col].entity = ROAD;
+            }
+        }
+    }
+}
+
+void refresh_headlights(struct tile board[ROWS][COLS]) {
+    clear_headlights(board);
+
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLS; col++) {
+            if (board[row][col].entity == CAR_FACING_RIGHT
+                && is_position_on_board(row, col + 1)
+                && board[row][col + 1].entity == ROAD) {
+                board[row][col + 1].entity = HEADLIGHTS;
+            } else if (board[row][col].entity == CAR_FACING_LEFT
+                && is_position_on_board(row, col - 1)
+                && board[row][col - 1].entity == ROAD) {
+                board[row][col - 1].entity = HEADLIGHTS;
+            }
+        }
+    }
+}
+
+void process_left_facing_cars(
+    struct tile board[ROWS][COLS],
+    int moved[ROWS][COLS]
+) {
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLS; col++) {
+            if (moved[row][col] || board[row][col].entity != CAR_FACING_LEFT) {
+                continue;
+            }
+            if (is_valid_car_destination(board, row, col - 1)) {
+                board[row][col].entity = ROAD;
+                board[row][col - 1].entity = CAR_FACING_LEFT;
+                moved[row][col - 1] = 1;
+            } else {
+                board[row][col].entity = CAR_FACING_RIGHT;
+                moved[row][col] = 1;
+            }
+        }
+    }
+}
+
+void process_right_facing_cars(
+    struct tile board[ROWS][COLS],
+    int moved[ROWS][COLS]
+) {
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = COLS - 1; col >= 0; col--) {
+            if (moved[row][col] || board[row][col].entity != CAR_FACING_RIGHT) {
+                continue;
+            }
+            if (is_valid_car_destination(board, row, col + 1)) {
+                board[row][col].entity = ROAD;
+                board[row][col + 1].entity = CAR_FACING_RIGHT;
+                moved[row][col + 1] = 1;
+            } else {
+                board[row][col].entity = CAR_FACING_LEFT;
+                moved[row][col] = 1;
+            }
+        }
+    }
+}
+
+void run_car_turn(struct tile board[ROWS][COLS]) {
+    int moved[ROWS][COLS] = {{0}};
+
+    process_left_facing_cars(board, moved);
+    process_right_facing_cars(board, moved);
+    refresh_headlights(board);
 }
 
 int can_build_road(
