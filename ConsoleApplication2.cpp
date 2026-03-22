@@ -113,13 +113,24 @@ void process_gameplay_phase(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
-    int score,
+    int *score,
     int target_score
 );
 int process_player_move(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
+    char command
+);
+int process_gameplay_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
     char command
 );
 
@@ -150,7 +161,13 @@ int main(void) {
     }
 
     start_gameplay_phase(board, player_row, player_col, score, target_score);
-    process_gameplay_phase(board, &player_row, &player_col, score, target_score);
+    process_gameplay_phase(
+        board,
+        &player_row,
+        &player_col,
+        &score,
+        target_score
+    );
 
     return 0;
 }
@@ -240,23 +257,96 @@ void process_gameplay_phase(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
-    int score,
+    int *score,
     int target_score
 ) {
+    int turns_taken = 0;
+    int step_count = 0;
+    int coins_collected = 0;
     char command;
 
     while (scanf(" %c", &command) == 1) {
-        if (command == 'q') {
-            printf("============= Quitting Game =============\n");
+        if (process_gameplay_turn(
+                board,
+                player_row,
+                player_col,
+                score,
+                target_score,
+                &turns_taken,
+                &step_count,
+                &coins_collected,
+                command
+            )) {
             return;
         }
+    }
+}
 
-        if (command == 'w' || command == 'a' || command == 's'
-            || command == 'd' || command == 'R') {
-            process_player_move(board, player_row, player_col, command);
-            print_board(board, *player_row, *player_col, score, target_score);
+int process_gameplay_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    char command
+) {
+    int successful_move = 0;
+
+    if (command == 'q') {
+        printf("============= Quitting Game =============\n");
+        return 1;
+    }
+
+    if (command == 'p') {
+        print_game_statistics(
+            *turns_taken,
+            *step_count,
+            *coins_collected,
+            *score
+        );
+        return 0;
+    }
+
+    if (command != 'w' && command != 'a' && command != 's'
+        && command != 'd' && command != 'R') {
+        return 0;
+    }
+
+    (*turns_taken)++;
+
+    if (command != 'R') {
+        successful_move = process_player_move(
+            board,
+            player_row,
+            player_col,
+            command
+        );
+        *step_count += successful_move;
+
+        if (successful_move && board[*player_row][*player_col].entity == COIN) {
+            board[*player_row][*player_col].entity = EMPTY;
+            *score += 5;
+            (*coins_collected)++;
         }
     }
+
+    print_board(board, *player_row, *player_col, *score, target_score);
+
+    if (*score >= target_score) {
+        print_game_statistics(
+            *turns_taken,
+            *step_count,
+            *coins_collected,
+            *score
+        );
+        print_game_won();
+        return 1;
+    }
+
+    return 0;
 }
 
 int process_player_move(
