@@ -16,6 +16,8 @@
 #define INVALID_COL -1
 #define INITIAL_POINTS 0
 #define DEFAULT_POINT_TARGET 20
+#define MAX_TUNNELS 10
+#define INVALID_TUNNEL_ID -1
 
 // Add your own #define constants below this line
 // Provided Enums
@@ -43,6 +45,7 @@ enum game_mode {
 // Represents a tile on the board (you may edit this and add your own fields)
 struct tile {
     enum entity entity;
+    int tunnel_id;
 };
 
 // Add your own structs below this line
@@ -139,6 +142,21 @@ int is_valid_player_destination(
     int row,
     int col
 );
+int resolve_tunnel_move(
+    struct tile board[ROWS][COLS],
+    int original_row,
+    int original_col,
+    int *player_row,
+    int *player_col,
+    char command
+);
+int find_tunnel_exit(
+    struct tile board[ROWS][COLS],
+    int entry_row,
+    int entry_col,
+    int *exit_row,
+    int *exit_col
+);
 int is_gameplay_move_command(char command);
 void collect_coin(
     struct tile board[ROWS][COLS],
@@ -154,6 +172,26 @@ void handle_road_setup_command(
 );
 void handle_car_setup_command(struct tile board[ROWS][COLS]);
 void handle_target_setup_command(int *target_score);
+int handle_wombat_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+);
+int read_wombat_tunnel_command(char *subcommand);
+int can_place_wombat_tunnel(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int row,
+    int col
+);
+void place_wombat_tunnel_pair(
+    struct tile board[ROWS][COLS],
+    int row_1,
+    int col_1,
+    int row_2,
+    int col_2
+);
 int dispatch_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
@@ -234,6 +272,10 @@ int handle_game_won(
     int coins_collected
 );
 int should_attempt_scroll(int command, int original_row, int successful_move);
+int should_attempt_tunnel_scroll(
+    int successful_move,
+    int player_row
+);
 int can_scroll_player_to_top(
     struct tile board[ROWS][COLS],
     int started_on_top_row,
@@ -395,6 +437,9 @@ int prepare_driving_turn(
     char command
 );
 
+static int g_next_tunnel_id = 0;
+static int g_last_move_used_tunnel = 0;
+
 // Provided sample main() function (you will need to modify this)
 int main(void) {
     struct tile board[ROWS][COLS];
@@ -513,6 +558,68 @@ int process_setup_command(
         target_score,
         command
     );
+}
+
+int read_wombat_tunnel_command(char *subcommand) {
+    return scanf(" %c", subcommand) == 1;
+}
+
+int can_place_wombat_tunnel(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int row,
+    int col
+) {
+    return is_position_on_board(row, col)
+        && !is_tile_occupied(board, player_row, player_col, row, col);
+}
+
+void place_wombat_tunnel_pair(
+    struct tile board[ROWS][COLS],
+    int row_1,
+    int col_1,
+    int row_2,
+    int col_2
+) {
+    board[row_1][col_1].entity = WOMBAT_TUNNEL;
+    board[row_1][col_1].tunnel_id = g_next_tunnel_id;
+    board[row_2][col_2].entity = WOMBAT_TUNNEL;
+    board[row_2][col_2].tunnel_id = g_next_tunnel_id;
+    g_next_tunnel_id++;
+}
+
+int handle_wombat_setup_command(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+) {
+    int row_1;
+    int col_1;
+    int row_2;
+    int col_2;
+
+    if (scanf("%d %d %d %d", &row_1, &col_1, &row_2, &col_2) != 4) {
+        return 1;
+    }
+    if (g_next_tunnel_id >= MAX_TUNNELS) {
+        printf("Invalid feature: too many tunnels!\n");
+        return 1;
+    }
+    if (row_1 == row_2 && col_1 == col_2) {
+        printf("Invalid location: wombat couldn't dig a tunnel here!\n");
+        return 1;
+    }
+    if (!can_place_wombat_tunnel(board, player_row, player_col, row_1, col_1)
+        || !can_place_wombat_tunnel(
+            board, player_row, player_col, row_2, col_2
+        )) {
+        printf("Invalid location: wombat couldn't dig a tunnel here!\n");
+        return 1;
+    }
+
+    place_wombat_tunnel_pair(board, row_1, col_1, row_2, col_2);
+    return 1;
 }
 
 void start_gameplay_phase(
@@ -887,8 +994,13 @@ void restore_top_row_coins(
 }
 
 int should_attempt_scroll(int command, int original_row, int successful_move) {
-    return command == 'w'
+    return !g_last_move_used_tunnel
+        && command == 'w'
         && (original_row == 0 || (original_row <= 6 && successful_move));
+}
+
+int should_attempt_tunnel_scroll(int successful_move, int player_row) {
+    return successful_move && g_last_move_used_tunnel && player_row <= 6;
 }
 
 int can_scroll_player_to_top(
@@ -1025,6 +1137,23 @@ int finish_scrolling_turn(
             )) {
             return 1;
         }
+    } else if (should_attempt_tunnel_scroll(successful_move, *player_row)) {
+        if (attempt_scroll(
+                board,
+                player_row,
+                player_col,
+                score,
+                target_score,
+                turns_taken,
+                step_count,
+                coins_collected,
+                coin_map,
+                row_ids,
+                0,
+                1
+            )) {
+            return 1;
+        }
     }
 
     print_board(board, *player_row, player_col, *score, target_score);
@@ -1037,9 +1166,12 @@ int process_player_move(
     int *player_col,
     char command
 ) {
+    int original_row = *player_row;
+    int original_col = *player_col;
     int destination_row = *player_row;
     int destination_col = *player_col;
 
+    g_last_move_used_tunnel = 0;
     if (command == 'R') {
         return 1;
     }
@@ -1059,6 +1191,16 @@ int process_player_move(
 
     *player_row = destination_row;
     *player_col = destination_col;
+    if (board[destination_row][destination_col].entity == WOMBAT_TUNNEL) {
+        return resolve_tunnel_move(
+            board,
+            original_row,
+            original_col,
+            player_row,
+            player_col,
+            command
+        );
+    }
     return 1;
 }
 
@@ -1085,6 +1227,61 @@ int is_valid_player_destination(
 ) {
     return is_position_on_board(row, col)
         && board[row][col].entity != TREE;
+}
+
+int resolve_tunnel_move(
+    struct tile board[ROWS][COLS],
+    int original_row,
+    int original_col,
+    int *player_row,
+    int *player_col,
+    char command
+) {
+    int exit_row;
+    int exit_col;
+
+    if (!find_tunnel_exit(
+            board, *player_row, *player_col, &exit_row, &exit_col
+        )) {
+        *player_row = original_row;
+        *player_col = original_col;
+        return 0;
+    }
+
+    update_destination_from_command(command, &exit_row, &exit_col);
+    if (!is_valid_player_destination(board, exit_row, exit_col)) {
+        *player_row = original_row;
+        *player_col = original_col;
+        return 0;
+    }
+
+    *player_row = exit_row;
+    *player_col = exit_col;
+    g_last_move_used_tunnel = 1;
+    return 1;
+}
+
+int find_tunnel_exit(
+    struct tile board[ROWS][COLS],
+    int entry_row,
+    int entry_col,
+    int *exit_row,
+    int *exit_col
+) {
+    int tunnel_id = board[entry_row][entry_col].tunnel_id;
+
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLS; col++) {
+            if ((row != entry_row || col != entry_col)
+                && board[row][col].entity == WOMBAT_TUNNEL
+                && board[row][col].tunnel_id == tunnel_id) {
+                *exit_row = row;
+                *exit_col = col;
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 int is_gameplay_move_command(char command) {
@@ -1137,6 +1334,7 @@ void place_basic_feature(
             printf("Invalid location: tile is occupied!\n");
         } else {
             board[row][col].entity = feature;
+            board[row][col].tunnel_id = INVALID_TUNNEL_ID;
         }
     }
 }
@@ -1208,6 +1406,8 @@ int dispatch_setup_command(
     int *target_score,
     char command
 ) {
+    char subcommand;
+
     if (command == 'c' || command == 't') {
         place_basic_feature(
             board,
@@ -1228,6 +1428,12 @@ int dispatch_setup_command(
     if (command == 'x') {
         handle_target_setup_command(target_score);
         return 1;
+    }
+    if (command == 'w') {
+        if (read_wombat_tunnel_command(&subcommand) && subcommand == 't') {
+            return handle_wombat_setup_command(board, player_row, player_col);
+        }
+        return 0;
     }
     return 0;
 }
@@ -1450,7 +1656,8 @@ int can_build_road(
         if (board[row][col].entity == COIN
             || board[row][col].entity == CAR_FACING_RIGHT
             || board[row][col].entity == CAR_FACING_LEFT
-            || board[row][col].entity == HEADLIGHTS) {
+            || board[row][col].entity == HEADLIGHTS
+            || board[row][col].entity == WOMBAT_TUNNEL) {
             return 0;
         }
         if (board[row][col].entity == TREE) {
@@ -1466,6 +1673,7 @@ void build_road(struct tile board[ROWS][COLS], int row) {
 
     for (col = 0; col < COLS; col++) {
         board[row][col].entity = ROAD;
+        board[row][col].tunnel_id = INVALID_TUNNEL_ID;
     }
 }
 
@@ -1477,13 +1685,17 @@ void place_car(
 ) {
     if (direction == 'r') {
         board[row][col].entity = CAR_FACING_RIGHT;
+        board[row][col].tunnel_id = INVALID_TUNNEL_ID;
         if (col + 1 < COLS && board[row][col + 1].entity == ROAD) {
             board[row][col + 1].entity = HEADLIGHTS;
+            board[row][col + 1].tunnel_id = INVALID_TUNNEL_ID;
         }
     } else if (direction == 'l') {
         board[row][col].entity = CAR_FACING_LEFT;
+        board[row][col].tunnel_id = INVALID_TUNNEL_ID;
         if (col - 1 >= 0 && board[row][col - 1].entity == ROAD) {
             board[row][col - 1].entity = HEADLIGHTS;
+            board[row][col - 1].tunnel_id = INVALID_TUNNEL_ID;
         }
     }
 }
@@ -1507,9 +1719,13 @@ void print_welcome(void) {
 
 // Given a 2D board array, initialises all tile entities to EMPTY.
 void initialise_board(struct tile board[ROWS][COLS]) {
+    g_next_tunnel_id = 0;
+    g_last_move_used_tunnel = 0;
+
     for (int row = 0; row < ROWS; row++) {
         for (int col = 0; col < COLS; col++) {
             board[row][col].entity = EMPTY;
+            board[row][col].tunnel_id = INVALID_TUNNEL_ID;
         }
     }
 }
@@ -1550,6 +1766,8 @@ void print_board(
                 printf("0_]");
             } else if (board[row][col].entity == HEADLIGHTS) {
                 printf("###");
+            } else if (board[row][col].entity == WOMBAT_TUNNEL) {
+                printf("(%d)", board[row][col].tunnel_id);
             } else {
                 printf("   ");
             }
