@@ -305,6 +305,22 @@ void gameplay_stage_3_3_start_scrolling_mode(
     int score,
     int target_score
 );
+void main_run_setup_phase(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int score,
+    int *target_score,
+    enum game_mode *mode
+);
+void main_start_selected_mode(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    enum game_mode mode
+);
 
 static int g_next_tunnel_id = 0;
 static int g_last_move_used_tunnel = 0;
@@ -959,60 +975,78 @@ int main(void) {
     int score = INITIAL_POINTS;
     int target_score = DEFAULT_POINT_TARGET;
     enum game_mode mode = STATIC_MODE;
-    char command;
 
     print_welcome();
     initialise_board(board);
+    main_run_setup_phase(
+        board,
+        &player_row,
+        &player_col,
+        score,
+        &target_score,
+        &mode
+    );
+    main_start_selected_mode(
+        board,
+        player_row,
+        player_col,
+        score,
+        target_score,
+        mode
+    );
+
+    return 0;
+}
+
+void main_run_setup_phase(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int score,
+    int *target_score,
+    enum game_mode *mode
+) {
+    char command;
 
     setup_stage_1_1_print_setup_banner();
-    setup_stage_1_2_read_valid_start_position(&player_row, &player_col);
-    print_board(board, player_row, player_col, score, target_score);
-
+    setup_stage_1_2_read_valid_start_position(player_row, player_col);
+    print_board(board, *player_row, *player_col, score, *target_score);
     printf("Enter setup commands:\n");
+
     while (scanf(" %c", &command) == 1 && command != 'e') {
         if (!setup_stage_1_3_process_basic_setup_commands(
-                board, player_row, player_col, command
+                board, *player_row, *player_col, command
             )) {
             setup_stage_1_4_process_advanced_setup_commands(
-                board,
-                player_row,
-                player_col,
-                &target_score,
-                &mode,
-                command
+                board, *player_row, *player_col, target_score, mode, command
             );
         }
     }
+}
 
+void main_start_selected_mode(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    enum game_mode mode
+) {
     if (mode == DRIVING_MODE) {
         gameplay_stage_3_2_start_driving_mode(
-            board,
-            player_row,
-            player_col,
-            score,
-            target_score
+            board, player_row, player_col, score, target_score
         );
+        return;
     }
-    else if (mode == SCROLLING_MODE) {
+    if (mode == SCROLLING_MODE) {
         gameplay_stage_3_3_start_scrolling_mode(
-            board,
-            player_row,
-            player_col,
-            score,
-            target_score
+            board, player_row, player_col, score, target_score
         );
+        return;
     }
-    else {
-        gameplay_stage_3_4_start_static_mode(
-            board,
-            player_row,
-            player_col,
-            score,
-            target_score
-        );
-    }
-
-    return 0;
+    gameplay_stage_3_4_start_static_mode(
+        board, player_row, player_col, score, target_score
+    );
 }
 
 void print_welcome(void) {

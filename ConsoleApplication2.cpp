@@ -361,6 +361,16 @@ int finish_driving_turn_before_cars(
     int step_count,
     int coins_collected
 );
+int prepare_driving_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    char command
+);
 
 // Provided sample main() function (you will need to modify this)
 int main(void) {
@@ -610,6 +620,41 @@ int process_driving_turn(
     int *coins_collected,
     char command
 ) {
+    int turn_ready = prepare_driving_turn(
+        board,
+        player_row,
+        player_col,
+        score,
+        turns_taken,
+        step_count,
+        coins_collected,
+        command
+    );
+
+    if (turn_ready != 1) {
+        return turn_ready;
+    }
+    if (finish_driving_turn_before_cars(board, *player_row, *player_col,
+            *score, target_score, *turns_taken, *step_count,
+            *coins_collected)) {
+        return 1;
+    }
+
+    run_car_turn(board);
+    return finish_gameplay_turn(board, *player_row, *player_col, *score,
+        target_score, *turns_taken, *step_count, *coins_collected);
+}
+
+int prepare_driving_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    char command
+) {
     if (handle_gameplay_status_command(
             *turns_taken, *step_count, *coins_collected, *score, command)) {
         return 1;
@@ -621,15 +666,7 @@ int process_driving_turn(
     (*turns_taken)++;
     apply_gameplay_move(board, player_row, player_col, score,
         step_count, coins_collected, command);
-    if (finish_driving_turn_before_cars(board, *player_row, *player_col,
-            *score, target_score, *turns_taken, *step_count,
-            *coins_collected)) {
-        return 1;
-    }
-
-    run_car_turn(board);
-    return finish_gameplay_turn(board, *player_row, *player_col, *score,
-        target_score, *turns_taken, *step_count, *coins_collected);
+    return 1;
 }
 
 int finish_driving_turn_before_cars(
