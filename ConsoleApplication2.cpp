@@ -661,6 +661,9 @@ int process_driving_turn(
         command
     );
 
+    if (turn_ready < 0) {
+        return 1;
+    }
     if (turn_ready != 1) {
         return turn_ready;
     }
@@ -685,9 +688,18 @@ int prepare_driving_turn(
     int *coins_collected,
     char command
 ) {
-    if (handle_gameplay_status_command(
-            *turns_taken, *step_count, *coins_collected, *score, command)) {
-        return 1;
+    if (command == 'q') {
+        printf("============= Quitting Game =============\n");
+        return -1;
+    }
+    if (command == 'p') {
+        print_game_statistics(
+            *turns_taken,
+            *step_count,
+            *coins_collected,
+            *score
+        );
+        return 0;
     }
     if (!is_gameplay_move_command(command)) {
         return 0;
