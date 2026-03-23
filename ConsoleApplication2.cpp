@@ -487,12 +487,8 @@ void print_setup_phase_banner(void) {
 }
 
 void read_starting_position(int *player_row, int *player_col) {
-    struct tile board[ROWS][COLS];
-    initialise_board(board);
-
     while (!is_position_on_board(*player_row, *player_col)) {
         printf("Enter the starting position: ");
-        print_board(board, INVALID_ROW, INVALID_COL, INITIAL_POINTS, DEFAULT_POINT_TARGET);
         if (scanf("%d %d", player_row, player_col) != 2) {
             return;
         }
