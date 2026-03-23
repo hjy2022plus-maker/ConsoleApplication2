@@ -804,7 +804,6 @@ int attempt_scroll(
     int started_on_top_row
 ) {
     if (!can_scroll_player_to_top(board, started_on_top_row, player_col)) {
-        print_board(board, *player_row, player_col, *score, target_score);
         return 0;
     }
 
@@ -829,31 +828,33 @@ int finish_scroll_after_rotation(
         *player_row = 0;
         (*step_count)++;
         collect_coin(board, *player_row, player_col, score, coins_collected);
-        if (handle_collision(
-                board,
-                *player_row,
-                player_col,
-                *score,
-                target_score,
-                *turns_taken,
-                *step_count,
-                *coins_collected
-            )) {
-            return 1;
-        }
-        print_board(board, *player_row, player_col, *score, target_score);
-        if (*score < target_score) {
-            return 0;
-        }
-        print_game_statistics(*turns_taken, *step_count, *coins_collected,
-            *score);
-        print_game_won();
+    } else {
+        (*player_row)++;
+    }
+
+    if (handle_collision(
+            board,
+            *player_row,
+            player_col,
+            *score,
+            target_score,
+            *turns_taken,
+            *step_count,
+            *coins_collected
+        )) {
         return 1;
     }
 
-    (*player_row)++;
-    print_board(board, *player_row, player_col, *score, target_score);
-    return 0;
+    return handle_game_won(
+        board,
+        *player_row,
+        player_col,
+        *score,
+        target_score,
+        *turns_taken,
+        *step_count,
+        *coins_collected
+    );
 }
 
 int finish_scrolling_turn(
@@ -869,6 +870,22 @@ int finish_scrolling_turn(
     int original_row,
     int successful_move
 ) {
+    if (should_attempt_scroll(command, original_row, successful_move)) {
+        if (attempt_scroll(
+            board,
+            player_row,
+            player_col,
+            score,
+            target_score,
+            turns_taken,
+            step_count,
+            coins_collected,
+            original_row == 0
+        )) {
+            return 1;
+        }
+    }
+
     run_car_turn(board);
     if (handle_collision(
             board,
@@ -881,19 +898,6 @@ int finish_scrolling_turn(
             *coins_collected
         )) {
         return 1;
-    }
-    if (should_attempt_scroll(command, original_row, successful_move)) {
-        return attempt_scroll(
-            board,
-            player_row,
-            player_col,
-            score,
-            target_score,
-            turns_taken,
-            step_count,
-            coins_collected,
-            original_row == 0
-        );
     }
 
     print_board(board, *player_row, player_col, *score, target_score);
