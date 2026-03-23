@@ -192,6 +192,8 @@ int process_turn_by_mode(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     enum game_mode mode,
     char command
 );
@@ -204,7 +206,22 @@ int process_scrolling_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     char command
+);
+void initialise_scrolling_coin_map(
+    struct tile board[ROWS][COLS],
+    int coin_map[ROWS][COLS]
+);
+void rotate_board_rows(
+    struct tile board[ROWS][COLS],
+    int row_ids[ROWS]
+);
+void restore_top_row_coins(
+    struct tile board[ROWS][COLS],
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS]
 );
 int handle_game_won(
     struct tile board[ROWS][COLS],
@@ -216,7 +233,6 @@ int handle_game_won(
     int step_count,
     int coins_collected
 );
-void rotate_board_rows(struct tile board[ROWS][COLS]);
 int should_attempt_scroll(int command, int original_row, int successful_move);
 int can_scroll_player_to_top(
     struct tile board[ROWS][COLS],
@@ -232,7 +248,10 @@ int attempt_scroll(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
-    int started_on_top_row
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
+    int started_on_top_row,
+    int moved_up
 );
 int finish_scroll_after_rotation(
     struct tile board[ROWS][COLS],
@@ -243,6 +262,8 @@ int finish_scroll_after_rotation(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     int started_on_top_row
 );
 int finish_scrolling_turn(
@@ -254,6 +275,8 @@ int finish_scrolling_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     int command,
     int original_row,
     int successful_move
@@ -518,7 +541,14 @@ void process_gameplay_phase(
     int turns_taken = 0;
     int step_count = 0;
     int coins_collected = 0;
+    int coin_map[ROWS][COLS] = {{0}};
+    int row_ids[ROWS];
     char command;
+
+    initialise_scrolling_coin_map(board, coin_map);
+    for (int row = 0; row < ROWS; row++) {
+        row_ids[row] = row;
+    }
 
     while (scanf(" %c", &command) == 1) {
         if (process_turn_by_mode(
@@ -530,6 +560,8 @@ void process_gameplay_phase(
                 &turns_taken,
                 &step_count,
                 &coins_collected,
+                coin_map,
+                row_ids,
                 mode,
                 command
             )) {
@@ -547,13 +579,15 @@ int process_turn_by_mode(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     enum game_mode mode,
     char command
 ) {
     if (mode == SCROLLING_MODE) {
         return process_scrolling_turn(board, player_row, player_col, score,
-            target_score, turns_taken, step_count, coins_collected,
-            command);
+            target_score, turns_taken, step_count, coins_collected, coin_map,
+            row_ids, command);
     }
     if (mode == DRIVING_MODE) {
         return process_driving_turn(board, player_row, player_col, score,
@@ -705,7 +739,8 @@ int finish_driving_turn_before_cars(
 
 int process_scrolling_turn(struct tile board[ROWS][COLS], int *player_row,
     int *player_col, int *score, int target_score, int *turns_taken,
-    int *step_count, int *coins_collected, char command) {
+    int *step_count, int *coins_collected, int coin_map[ROWS][COLS],
+    int row_ids[ROWS], char command) {
     int original_row = 0;
     int successful_move = 0;
 
@@ -724,8 +759,8 @@ int process_scrolling_turn(struct tile board[ROWS][COLS], int *player_row,
     }
 
     return finish_scrolling_turn(board, player_row, *player_col, score,
-        target_score, turns_taken, step_count, coins_collected, command,
-        original_row, successful_move);
+        target_score, turns_taken, step_count, coins_collected, coin_map,
+        row_ids, command, original_row, successful_move);
 }
 
 int handle_move_and_pre_scroll_checks(
@@ -796,8 +831,23 @@ int handle_game_won(
     return 1;
 }
 
-void rotate_board_rows(struct tile board[ROWS][COLS]) {
+void initialise_scrolling_coin_map(
+    struct tile board[ROWS][COLS],
+    int coin_map[ROWS][COLS]
+) {
+    for (int row = 0; row < ROWS; row++) {
+        for (int col = 0; col < COLS; col++) {
+            coin_map[row][col] = board[row][col].entity == COIN;
+        }
+    }
+}
+
+void rotate_board_rows(
+    struct tile board[ROWS][COLS],
+    int row_ids[ROWS]
+) {
     struct tile bottom_row[COLS];
+    int bottom_row_id = row_ids[ROWS - 1];
 
     for (int col = 0; col < COLS; col++) {
         bottom_row[col] = board[ROWS - 1][col];
@@ -806,9 +856,25 @@ void rotate_board_rows(struct tile board[ROWS][COLS]) {
         for (int col = 0; col < COLS; col++) {
             board[row][col] = board[row - 1][col];
         }
+        row_ids[row] = row_ids[row - 1];
     }
     for (int col = 0; col < COLS; col++) {
         board[0][col] = bottom_row[col];
+    }
+    row_ids[0] = bottom_row_id;
+}
+
+void restore_top_row_coins(
+    struct tile board[ROWS][COLS],
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS]
+) {
+    int source_row = row_ids[0];
+
+    for (int col = 0; col < COLS; col++) {
+        if (coin_map[source_row][col] && board[0][col].entity == EMPTY) {
+            board[0][col].entity = COIN;
+        }
     }
 }
 
@@ -838,16 +904,23 @@ int attempt_scroll(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
-    int started_on_top_row
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
+    int started_on_top_row,
+    int moved_up
 ) {
+    if (!started_on_top_row && !moved_up) {
+        return 0;
+    }
     if (!can_scroll_player_to_top(board, started_on_top_row, player_col)) {
         return 0;
     }
 
-    rotate_board_rows(board);
+    rotate_board_rows(board, row_ids);
+    restore_top_row_coins(board, coin_map, row_ids);
     return finish_scroll_after_rotation(board, player_row, player_col, score,
-        target_score, turns_taken, step_count, coins_collected,
-        started_on_top_row);
+        target_score, turns_taken, step_count, coins_collected, coin_map,
+        row_ids, started_on_top_row);
 }
 
 int finish_scroll_after_rotation(
@@ -859,8 +932,12 @@ int finish_scroll_after_rotation(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     int started_on_top_row
 ) {
+    (void) coin_map;
+    (void) row_ids;
     if (started_on_top_row) {
         *player_row = 0;
         (*step_count)++;
@@ -903,26 +980,12 @@ int finish_scrolling_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
     int command,
     int original_row,
     int successful_move
 ) {
-    if (should_attempt_scroll(command, original_row, successful_move)) {
-        if (attempt_scroll(
-            board,
-            player_row,
-            player_col,
-            score,
-            target_score,
-            turns_taken,
-            step_count,
-            coins_collected,
-            original_row == 0
-        )) {
-            return 1;
-        }
-    }
-
     run_car_turn(board);
     if (handle_collision(
             board,
@@ -935,6 +998,25 @@ int finish_scrolling_turn(
             *coins_collected
         )) {
         return 1;
+    }
+
+    if (should_attempt_scroll(command, original_row, successful_move)) {
+        if (attempt_scroll(
+                board,
+                player_row,
+                player_col,
+                score,
+                target_score,
+                turns_taken,
+                step_count,
+                coins_collected,
+                coin_map,
+                row_ids,
+                original_row == 0,
+                successful_move
+            )) {
+            return 1;
+        }
     }
 
     print_board(board, *player_row, player_col, *score, target_score);
