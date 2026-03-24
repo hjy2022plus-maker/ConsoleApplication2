@@ -1270,7 +1270,7 @@ int try_finish_scroll_with_board_rotation(
             coins_collected,
             coin_map,
             row_ids,
-            0,
+            *player_row == 0,
             0,
             1
         );
@@ -1873,7 +1873,9 @@ void print_board(
     for (int row = 0; row < ROWS; row++) {
         for (int col = 0; col < COLS; col++) {
             printf("|");
-            if (row == player_row && col == player_col) {
+            if (board[row][col].entity == WOMBAT_TUNNEL) {
+                printf("(%d)", board[row][col].tunnel_id);
+            } else if (row == player_row && col == player_col) {
                 if (is_player_shocked(board, player_row, player_col)) {
                     printf("0_0");
                 } else {
@@ -1893,8 +1895,6 @@ void print_board(
                 printf("0_]");
             } else if (board[row][col].entity == HEADLIGHTS) {
                 printf("###");
-            } else if (board[row][col].entity == WOMBAT_TUNNEL) {
-                printf("(%d)", board[row][col].tunnel_id);
             } else {
                 printf("   ");
             }
