@@ -108,6 +108,7 @@ int process_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score,
     char command
 );
@@ -124,12 +125,14 @@ void process_gameplay_phase(
     int *player_col,
     int *score,
     int target_score,
+    int *last_move_used_tunnel,
     enum game_mode mode
 );
 int process_player_move(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
+    int *last_move_used_tunnel,
     char command
 );
 void update_destination_from_command(
@@ -148,6 +151,7 @@ int resolve_tunnel_move(
     int original_col,
     int *player_row,
     int *player_col,
+    int *last_move_used_tunnel,
     char command
 );
 int find_tunnel_exit(
@@ -175,7 +179,8 @@ void handle_target_setup_command(int *target_score);
 int handle_wombat_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
-    int player_col
+    int player_col,
+    int *next_tunnel_id
 );
 int read_wombat_tunnel_command(char *subcommand);
 int can_place_wombat_tunnel(
@@ -190,12 +195,14 @@ void place_wombat_tunnel_pair(
     int row_1,
     int col_1,
     int row_2,
-    int col_2
+    int col_2,
+    int tunnel_id
 );
 int dispatch_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score,
     char command
 );
@@ -208,6 +215,7 @@ int process_gameplay_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 );
 int process_driving_turn(
@@ -219,6 +227,7 @@ int process_driving_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 );
 int process_turn_by_mode(
@@ -232,6 +241,7 @@ int process_turn_by_mode(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
+    int *last_move_used_tunnel,
     enum game_mode mode,
     char command
 );
@@ -246,6 +256,7 @@ int process_scrolling_turn(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
+    int *last_move_used_tunnel,
     char command
 );
 void initialise_scrolling_coin_map(
@@ -271,9 +282,15 @@ int handle_game_won(
     int step_count,
     int coins_collected
 );
-int should_attempt_scroll(int command, int original_row, int successful_move);
+int should_attempt_scroll(
+    int command,
+    int original_row,
+    int successful_move,
+    int last_move_used_tunnel
+);
 int should_attempt_tunnel_scroll(
     int successful_move,
+    int last_move_used_tunnel,
     int player_row
 );
 int can_scroll_player_to_top(
@@ -321,6 +338,7 @@ int finish_scrolling_turn(
     int row_ids[ROWS],
     int command,
     int original_row,
+    int last_move_used_tunnel,
     int successful_move
 );
 int handle_gameplay_status_command(
@@ -338,6 +356,7 @@ int handle_move_and_pre_scroll_checks(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command,
     int *original_row,
     int *successful_move
@@ -359,6 +378,7 @@ void apply_gameplay_move(
     int *score,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 );
 int finish_gameplay_turn(
@@ -406,6 +426,7 @@ enum game_mode read_setup_mode(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score
 );
 void run_game(
@@ -414,6 +435,7 @@ void run_game(
     int *player_col,
     int *score,
     int target_score,
+    int *last_move_used_tunnel,
     enum game_mode mode
 );
 int finish_driving_turn_before_cars(
@@ -434,11 +456,9 @@ int prepare_driving_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 );
-
-static int g_next_tunnel_id = 0;
-static int g_last_move_used_tunnel = 0;
 
 // Provided sample main() function (you will need to modify this)
 int main(void) {
@@ -447,6 +467,8 @@ int main(void) {
     int player_col = INVALID_COL;
     int score = INITIAL_POINTS;
     int target_score = DEFAULT_POINT_TARGET;
+    int next_tunnel_id = 0;
+    int last_move_used_tunnel = 0;
     enum game_mode mode = STATIC_MODE;
 
     print_welcome();
@@ -458,13 +480,20 @@ int main(void) {
         return 0;
     }
 
-    mode = read_setup_mode(board, player_row, player_col, &target_score);
+    mode = read_setup_mode(
+        board,
+        player_row,
+        player_col,
+        &next_tunnel_id,
+        &target_score
+    );
     run_game(
         board,
         &player_row,
         &player_col,
         &score,
         target_score,
+        &last_move_used_tunnel,
         mode
     );
     return 0;
@@ -474,6 +503,7 @@ enum game_mode read_setup_mode(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score
 ) {
     char command;
@@ -495,6 +525,7 @@ enum game_mode read_setup_mode(
             board,
             player_row,
             player_col,
+            next_tunnel_id,
             target_score,
             command
         );
@@ -508,6 +539,7 @@ void run_game(
     int *player_col,
     int *score,
     int target_score,
+    int *last_move_used_tunnel,
     enum game_mode mode
 ) {
     start_gameplay_phase(
@@ -523,6 +555,7 @@ void run_game(
         player_col,
         score,
         target_score,
+        last_move_used_tunnel,
         mode
     );
 }
@@ -548,6 +581,7 @@ int process_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score,
     char command
 ) {
@@ -555,6 +589,7 @@ int process_setup_command(
         board,
         player_row,
         player_col,
+        next_tunnel_id,
         target_score,
         command
     );
@@ -580,19 +615,20 @@ void place_wombat_tunnel_pair(
     int row_1,
     int col_1,
     int row_2,
-    int col_2
+    int col_2,
+    int tunnel_id
 ) {
     board[row_1][col_1].entity = WOMBAT_TUNNEL;
-    board[row_1][col_1].tunnel_id = g_next_tunnel_id;
+    board[row_1][col_1].tunnel_id = tunnel_id;
     board[row_2][col_2].entity = WOMBAT_TUNNEL;
-    board[row_2][col_2].tunnel_id = g_next_tunnel_id;
-    g_next_tunnel_id++;
+    board[row_2][col_2].tunnel_id = tunnel_id;
 }
 
 int handle_wombat_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
-    int player_col
+    int player_col,
+    int *next_tunnel_id
 ) {
     int row_1;
     int col_1;
@@ -602,7 +638,7 @@ int handle_wombat_setup_command(
     if (scanf("%d %d %d %d", &row_1, &col_1, &row_2, &col_2) != 4) {
         return 1;
     }
-    if (g_next_tunnel_id >= MAX_TUNNELS) {
+    if (*next_tunnel_id >= MAX_TUNNELS) {
         printf("Invalid feature: too many tunnels!\n");
         return 1;
     }
@@ -618,7 +654,9 @@ int handle_wombat_setup_command(
         return 1;
     }
 
-    place_wombat_tunnel_pair(board, row_1, col_1, row_2, col_2);
+    place_wombat_tunnel_pair(board, row_1, col_1, row_2, col_2,
+        *next_tunnel_id);
+    (*next_tunnel_id)++;
     return 1;
 }
 
@@ -639,6 +677,7 @@ void process_gameplay_phase(
     int *player_col,
     int *score,
     int target_score,
+    int *last_move_used_tunnel,
     enum game_mode mode
 ) {
     int turns_taken = 0;
@@ -665,6 +704,7 @@ void process_gameplay_phase(
                 &coins_collected,
                 coin_map,
                 row_ids,
+                last_move_used_tunnel,
                 mode,
                 command
             )) {
@@ -684,20 +724,23 @@ int process_turn_by_mode(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
+    int *last_move_used_tunnel,
     enum game_mode mode,
     char command
 ) {
     if (mode == SCROLLING_MODE) {
         return process_scrolling_turn(board, player_row, player_col, score,
             target_score, turns_taken, step_count, coins_collected, coin_map,
-            row_ids, command);
+            row_ids, last_move_used_tunnel, command);
     }
     if (mode == DRIVING_MODE) {
         return process_driving_turn(board, player_row, player_col, score,
-            target_score, turns_taken, step_count, coins_collected, command);
+            target_score, turns_taken, step_count, coins_collected,
+            last_move_used_tunnel, command);
     }
     return process_gameplay_turn(board, player_row, player_col, score,
-        target_score, turns_taken, step_count, coins_collected, command);
+        target_score, turns_taken, step_count, coins_collected,
+        last_move_used_tunnel, command);
 }
 
 int process_gameplay_turn(
@@ -709,6 +752,7 @@ int process_gameplay_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 ) {
     if (handle_gameplay_status_command(
@@ -732,6 +776,7 @@ int process_gameplay_turn(
         score,
         step_count,
         coins_collected,
+        last_move_used_tunnel,
         command
     );
     return finish_gameplay_turn(
@@ -755,6 +800,7 @@ int process_driving_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 ) {
     int turn_ready = prepare_driving_turn(
@@ -765,6 +811,7 @@ int process_driving_turn(
         turns_taken,
         step_count,
         coins_collected,
+        last_move_used_tunnel,
         command
     );
 
@@ -793,6 +840,7 @@ int prepare_driving_turn(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 ) {
     if (command == 'q') {
@@ -814,7 +862,7 @@ int prepare_driving_turn(
 
     (*turns_taken)++;
     apply_gameplay_move(board, player_row, player_col, score,
-        step_count, coins_collected, command);
+        step_count, coins_collected, last_move_used_tunnel, command);
     return 1;
 }
 
@@ -855,13 +903,13 @@ int finish_driving_turn_before_cars(
 int process_scrolling_turn(struct tile board[ROWS][COLS], int *player_row,
     int *player_col, int *score, int target_score, int *turns_taken,
     int *step_count, int *coins_collected, int coin_map[ROWS][COLS],
-    int row_ids[ROWS], char command) {
+    int row_ids[ROWS], int *last_move_used_tunnel, char command) {
     int original_row = 0;
     int successful_move = 0;
 
     if (handle_move_and_pre_scroll_checks(board, player_row, player_col, score,
-            turns_taken, step_count, coins_collected, command, &original_row,
-            &successful_move)) {
+            turns_taken, step_count, coins_collected, last_move_used_tunnel,
+            command, &original_row, &successful_move)) {
         return 1;
     }
     if (!is_gameplay_move_command(command)) {
@@ -875,7 +923,8 @@ int process_scrolling_turn(struct tile board[ROWS][COLS], int *player_row,
 
     return finish_scrolling_turn(board, player_row, *player_col, score,
         target_score, turns_taken, step_count, coins_collected, coin_map,
-        row_ids, command, original_row, successful_move);
+        row_ids, command, original_row, *last_move_used_tunnel,
+        successful_move);
 }
 
 int handle_move_and_pre_scroll_checks(
@@ -886,6 +935,7 @@ int handle_move_and_pre_scroll_checks(
     int *turns_taken,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command,
     int *original_row,
     int *successful_move
@@ -903,7 +953,7 @@ int handle_move_and_pre_scroll_checks(
 
     (*turns_taken)++;
     apply_gameplay_move(board, player_row, player_col, score, step_count,
-        coins_collected, command);
+        coins_collected, last_move_used_tunnel, command);
     *successful_move = *step_count > original_step_count;
     return 0;
 }
@@ -993,14 +1043,23 @@ void restore_top_row_coins(
     }
 }
 
-int should_attempt_scroll(int command, int original_row, int successful_move) {
-    return !g_last_move_used_tunnel
+int should_attempt_scroll(
+    int command,
+    int original_row,
+    int successful_move,
+    int last_move_used_tunnel
+) {
+    return !last_move_used_tunnel
         && command == 'w'
         && (original_row == 0 || (original_row <= 6 && successful_move));
 }
 
-int should_attempt_tunnel_scroll(int successful_move, int player_row) {
-    return successful_move && g_last_move_used_tunnel && player_row <= 6;
+int should_attempt_tunnel_scroll(
+    int successful_move,
+    int last_move_used_tunnel,
+    int player_row
+) {
+    return successful_move && last_move_used_tunnel && player_row <= 6;
 }
 
 int can_scroll_player_to_top(
@@ -1104,6 +1163,7 @@ int finish_scrolling_turn(
     int row_ids[ROWS],
     int command,
     int original_row,
+    int last_move_used_tunnel,
     int successful_move
 ) {
     run_car_turn(board);
@@ -1120,7 +1180,8 @@ int finish_scrolling_turn(
         return 1;
     }
 
-    if (should_attempt_scroll(command, original_row, successful_move)) {
+    if (should_attempt_scroll(command, original_row, successful_move,
+            last_move_used_tunnel)) {
         if (attempt_scroll(
                 board,
                 player_row,
@@ -1137,7 +1198,8 @@ int finish_scrolling_turn(
             )) {
             return 1;
         }
-    } else if (should_attempt_tunnel_scroll(successful_move, *player_row)) {
+    } else if (should_attempt_tunnel_scroll(successful_move,
+            last_move_used_tunnel, *player_row)) {
         if (attempt_scroll(
                 board,
                 player_row,
@@ -1164,6 +1226,7 @@ int process_player_move(
     struct tile board[ROWS][COLS],
     int *player_row,
     int *player_col,
+    int *last_move_used_tunnel,
     char command
 ) {
     int original_row = *player_row;
@@ -1171,7 +1234,7 @@ int process_player_move(
     int destination_row = *player_row;
     int destination_col = *player_col;
 
-    g_last_move_used_tunnel = 0;
+    *last_move_used_tunnel = 0;
     if (command == 'R') {
         return 1;
     }
@@ -1198,6 +1261,7 @@ int process_player_move(
             original_col,
             player_row,
             player_col,
+            last_move_used_tunnel,
             command
         );
     }
@@ -1235,6 +1299,7 @@ int resolve_tunnel_move(
     int original_col,
     int *player_row,
     int *player_col,
+    int *last_move_used_tunnel,
     char command
 ) {
     int exit_row;
@@ -1257,7 +1322,7 @@ int resolve_tunnel_move(
 
     *player_row = exit_row;
     *player_col = exit_col;
-    g_last_move_used_tunnel = 1;
+    *last_move_used_tunnel = 1;
     return 1;
 }
 
@@ -1403,18 +1468,20 @@ int dispatch_setup_command(
     struct tile board[ROWS][COLS],
     int player_row,
     int player_col,
+    int *next_tunnel_id,
     int *target_score,
     char command
 ) {
     char subcommand;
+    enum entity feature;
 
     if (command == 'c' || command == 't') {
-        place_basic_feature(
-            board,
-            player_row,
-            player_col,
-            command == 'c' ? COIN : TREE
-        );
+        if (command == 'c') {
+            feature = COIN;
+        } else {
+            feature = TREE;
+        }
+        place_basic_feature(board, player_row, player_col, feature);
         return 1;
     }
     if (command == 'r') {
@@ -1431,7 +1498,12 @@ int dispatch_setup_command(
     }
     if (command == 'w') {
         if (read_wombat_tunnel_command(&subcommand) && subcommand == 't') {
-            return handle_wombat_setup_command(board, player_row, player_col);
+            return handle_wombat_setup_command(
+                board,
+                player_row,
+                player_col,
+                next_tunnel_id
+            );
         }
         return 0;
     }
@@ -1463,6 +1535,7 @@ void apply_gameplay_move(
     int *score,
     int *step_count,
     int *coins_collected,
+    int *last_move_used_tunnel,
     char command
 ) {
     int successful_move;
@@ -1474,6 +1547,7 @@ void apply_gameplay_move(
         board,
         player_row,
         player_col,
+        last_move_used_tunnel,
         command
     );
     *step_count += successful_move;
@@ -1719,9 +1793,6 @@ void print_welcome(void) {
 
 // Given a 2D board array, initialises all tile entities to EMPTY.
 void initialise_board(struct tile board[ROWS][COLS]) {
-    g_next_tunnel_id = 0;
-    g_last_move_used_tunnel = 0;
-
     for (int row = 0; row < ROWS; row++) {
         for (int col = 0; col < COLS; col++) {
             board[row][col].entity = EMPTY;
