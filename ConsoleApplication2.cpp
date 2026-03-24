@@ -1369,7 +1369,7 @@ int resolve_tunnel_move(
         return 0;
     }
 
-    update_destination_from_command(command, &exit_row, &exit_col);
+    
     if (!is_valid_player_destination(board, exit_row, exit_col)) {
         *player_row = original_row;
         *player_col = original_col;
