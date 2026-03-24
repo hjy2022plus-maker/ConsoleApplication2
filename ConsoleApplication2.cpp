@@ -295,7 +295,7 @@ int should_attempt_tunnel_scroll(
 );
 int can_scroll_player_to_top(
     struct tile board[ROWS][COLS],
-    int started_on_top_row,
+    int player_at_top_before_scroll,
     int player_col
 );
 int attempt_scroll(
@@ -309,7 +309,8 @@ int attempt_scroll(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
-    int started_on_top_row,
+    int player_at_top_before_scroll,
+    int keep_player_on_top_after_scroll,
     int moved_up
 );
 int finish_scroll_after_rotation(
@@ -323,9 +324,25 @@ int finish_scroll_after_rotation(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
-    int started_on_top_row
+    int keep_player_on_top_after_scroll
 );
 int finish_scrolling_turn(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
+    int command,
+    int original_row,
+    int last_move_used_tunnel,
+    int successful_move
+);
+int try_finish_scroll_with_board_rotation(
     struct tile board[ROWS][COLS],
     int *player_row,
     int player_col,
@@ -1064,10 +1081,10 @@ int should_attempt_tunnel_scroll(
 
 int can_scroll_player_to_top(
     struct tile board[ROWS][COLS],
-    int started_on_top_row,
+    int player_at_top_before_scroll,
     int player_col
 ) {
-    if (!started_on_top_row) {
+    if (!player_at_top_before_scroll) {
         return 1;
     }
 
@@ -1085,13 +1102,16 @@ int attempt_scroll(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
-    int started_on_top_row,
+    int player_at_top_before_scroll,
+    int keep_player_on_top_after_scroll,
     int moved_up
 ) {
-    if (!started_on_top_row && !moved_up) {
+    if (!player_at_top_before_scroll && !moved_up) {
         return 0;
     }
-    if (!can_scroll_player_to_top(board, started_on_top_row, player_col)) {
+    if (!can_scroll_player_to_top(
+            board, player_at_top_before_scroll, player_col
+        )) {
         return 0;
     }
 
@@ -1099,7 +1119,7 @@ int attempt_scroll(
     restore_top_row_coins(board, coin_map, row_ids);
     return finish_scroll_after_rotation(board, player_row, player_col, score,
         target_score, turns_taken, step_count, coins_collected, coin_map,
-        row_ids, started_on_top_row);
+        row_ids, keep_player_on_top_after_scroll);
 }
 
 int finish_scroll_after_rotation(
@@ -1113,11 +1133,11 @@ int finish_scroll_after_rotation(
     int *coins_collected,
     int coin_map[ROWS][COLS],
     int row_ids[ROWS],
-    int started_on_top_row
+    int keep_player_on_top_after_scroll
 ) {
     (void) coin_map;
     (void) row_ids;
-    if (started_on_top_row) {
+    if (keep_player_on_top_after_scroll) {
         *player_row = 0;
         (*step_count)++;
         collect_coin(board, *player_row, player_col, score, coins_collected);
@@ -1180,45 +1200,81 @@ int finish_scrolling_turn(
         return 1;
     }
 
-    if (should_attempt_scroll(command, original_row, successful_move,
-            last_move_used_tunnel)) {
-        if (attempt_scroll(
-                board,
-                player_row,
-                player_col,
-                score,
-                target_score,
-                turns_taken,
-                step_count,
-                coins_collected,
-                coin_map,
-                row_ids,
-                original_row == 0,
-                successful_move
-            )) {
-            return 1;
-        }
-    } else if (should_attempt_tunnel_scroll(successful_move,
-            last_move_used_tunnel, *player_row)) {
-        if (attempt_scroll(
-                board,
-                player_row,
-                player_col,
-                score,
-                target_score,
-                turns_taken,
-                step_count,
-                coins_collected,
-                coin_map,
-                row_ids,
-                0,
-                1
-            )) {
-            return 1;
-        }
+    if (try_finish_scroll_with_board_rotation(
+            board,
+            player_row,
+            player_col,
+            score,
+            target_score,
+            turns_taken,
+            step_count,
+            coins_collected,
+            coin_map,
+            row_ids,
+            command,
+            original_row,
+            last_move_used_tunnel,
+            successful_move
+        )) {
+        return 1;
     }
 
     print_board(board, *player_row, player_col, *score, target_score);
+    return 0;
+}
+
+int try_finish_scroll_with_board_rotation(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int player_col,
+    int *score,
+    int target_score,
+    int *turns_taken,
+    int *step_count,
+    int *coins_collected,
+    int coin_map[ROWS][COLS],
+    int row_ids[ROWS],
+    int command,
+    int original_row,
+    int last_move_used_tunnel,
+    int successful_move
+) {
+    if (should_attempt_scroll(command, original_row, successful_move,
+            last_move_used_tunnel)) {
+        return attempt_scroll(
+            board,
+            player_row,
+            player_col,
+            score,
+            target_score,
+            turns_taken,
+            step_count,
+            coins_collected,
+            coin_map,
+            row_ids,
+            original_row == 0,
+            original_row == 0,
+            successful_move
+        );
+    }
+    if (should_attempt_tunnel_scroll(successful_move, last_move_used_tunnel,
+            *player_row)) {
+        return attempt_scroll(
+            board,
+            player_row,
+            player_col,
+            score,
+            target_score,
+            turns_taken,
+            step_count,
+            coins_collected,
+            coin_map,
+            row_ids,
+            *player_row == 0,
+            0,
+            1
+        );
+    }
     return 0;
 }
 
