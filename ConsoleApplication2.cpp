@@ -1270,7 +1270,7 @@ int try_finish_scroll_with_board_rotation(
             coins_collected,
             coin_map,
             row_ids,
-            *player_row == 0,
+            0,
             0,
             1
         );
