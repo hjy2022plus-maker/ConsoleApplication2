@@ -1109,7 +1109,8 @@ int attempt_scroll(
     if (!player_at_top_before_scroll && !moved_up) {
         return 0;
     }
-    if (!can_scroll_player_to_top(
+    if (player_at_top_before_scroll && keep_player_on_top_after_scroll
+        && !can_scroll_player_to_top(
             board, player_at_top_before_scroll, player_col
         )) {
         return 0;
@@ -1369,7 +1370,7 @@ int resolve_tunnel_move(
         return 0;
     }
 
-    
+    update_destination_from_command(command, &exit_row, &exit_col);
     if (!is_valid_player_destination(board, exit_row, exit_col)) {
         *player_row = original_row;
         *player_col = original_col;
