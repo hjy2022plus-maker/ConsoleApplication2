@@ -1239,8 +1239,13 @@ int try_finish_scroll_with_board_rotation(
     int last_move_used_tunnel,
     int successful_move
 ) {
+    int top_row_scroll_would_start_on_tunnel = original_row == 0
+        && *player_row == 0
+        && board[*player_row][player_col].entity == WOMBAT_TUNNEL;
+
     if (should_attempt_scroll(command, original_row, successful_move,
-            last_move_used_tunnel)) {
+            last_move_used_tunnel)
+        && !top_row_scroll_would_start_on_tunnel) {
         return attempt_scroll(
             board,
             player_row,
