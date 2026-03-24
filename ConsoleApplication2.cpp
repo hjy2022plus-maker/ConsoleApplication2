@@ -1873,14 +1873,14 @@ void print_board(
     for (int row = 0; row < ROWS; row++) {
         for (int col = 0; col < COLS; col++) {
             printf("|");
-            if (board[row][col].entity == WOMBAT_TUNNEL) {
-                printf("(%d)", board[row][col].tunnel_id);
-            } else if (row == player_row && col == player_col) {
+            if (row == player_row && col == player_col) {
                 if (is_player_shocked(board, player_row, player_col)) {
                     printf("0_0");
                 } else {
                     printf("^_^");
                 }
+            } else if (board[row][col].entity == WOMBAT_TUNNEL) {
+                printf("(%d)", board[row][col].tunnel_id);
             } else if (board[row][col].entity == EMPTY) {
                 printf("   ");
             } else if (board[row][col].entity == COIN) {
