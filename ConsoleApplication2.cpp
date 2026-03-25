@@ -397,6 +397,16 @@ int handle_scroll_post_move_checks(
     int step_count,
     int coins_collected
 );
+int resolve_end_state_without_board(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
+);
 void apply_gameplay_move(
     struct tile board[ROWS][COLS],
     int *player_row,
@@ -417,6 +427,8 @@ int finish_gameplay_turn(
     int step_count,
     int coins_collected
 );
+int is_shocking_player_tile(enum entity tile);
+int is_fatal_player_tile(enum entity tile);
 int is_player_shocked(
     struct tile board[ROWS][COLS],
     int player_row,
@@ -902,7 +914,7 @@ int finish_driving_turn_before_cars(
     int step_count,
     int coins_collected
 ) {
-    if (handle_collision(
+    if (resolve_end_state_without_board(
             board,
             player_row,
             player_col,
@@ -994,12 +1006,8 @@ int handle_scroll_post_move_checks(
     int step_count,
     int coins_collected
 ) {
-    if (handle_collision(board, player_row, player_col, score, target_score,
-            turns_taken, step_count, coins_collected)) {
-        return 1;
-    }
-    return handle_game_won(board, player_row, player_col, score, target_score,
-        turns_taken, step_count, coins_collected);
+    return resolve_end_state_without_board(board, player_row, player_col, score,
+        target_score, turns_taken, step_count, coins_collected);
 }
 
 int handle_game_won(
@@ -1020,6 +1028,24 @@ int handle_game_won(
     print_game_statistics(turns_taken, step_count, coins_collected, score);
     print_game_won();
     return 1;
+}
+
+int resolve_end_state_without_board(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int score,
+    int target_score,
+    int turns_taken,
+    int step_count,
+    int coins_collected
+) {
+    if (handle_collision(board, player_row, player_col, score, target_score,
+            turns_taken, step_count, coins_collected)) {
+        return 1;
+    }
+    return handle_game_won(board, player_row, player_col, score, target_score,
+        turns_taken, step_count, coins_collected);
 }
 
 void initialise_scrolling_coin_map(
@@ -1703,11 +1729,17 @@ int is_player_shocked(
     int player_row,
     int player_col
 ) {
-    enum entity tile = board[player_row][player_col].entity;
+    return is_shocking_player_tile(board[player_row][player_col].entity);
+}
 
+int is_shocking_player_tile(enum entity tile) {
     return tile == HEADLIGHTS
         || tile == CAR_FACING_LEFT
         || tile == CAR_FACING_RIGHT;
+}
+
+int is_fatal_player_tile(enum entity tile) {
+    return tile == CAR_FACING_LEFT || tile == CAR_FACING_RIGHT;
 }
 
 int handle_collision(
@@ -1722,9 +1754,7 @@ int handle_collision(
 ) {
     enum entity tile = board[player_row][player_col].entity;
 
-    // Headlights only shock Penny; only the car body ends the game.
-    if (tile != CAR_FACING_LEFT
-        && tile != CAR_FACING_RIGHT) {
+    if (!is_fatal_player_tile(tile)) {
         return 0;
     }
 
