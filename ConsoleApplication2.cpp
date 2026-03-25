@@ -1254,7 +1254,7 @@ int try_finish_scroll_with_board_rotation(
             coin_map,
             row_ids,
             original_row == 0,
-            0,
+            original_row == 0,
             successful_move
         );
     }
