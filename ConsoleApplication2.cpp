@@ -694,7 +694,7 @@ int handle_wombat_setup_command(
 
     place_wombat_tunnel_pair(board, row_1, col_1, row_2, col_2,
         *next_tunnel_id);
-    (*next_tunnel_id)++;
+    *next_tunnel_id += 1;
     return 1;
 }
 
@@ -726,7 +726,7 @@ void process_gameplay_phase(
     char command;
 
     initialise_scrolling_coin_map(board, coin_map);
-    for (int row = 0; row < ROWS; row++) {
+    for (int row = 0; row < ROWS; row += 1) {
         row_ids[row] = row;
     }
 
@@ -806,7 +806,7 @@ int process_gameplay_turn(
         return 0;
     }
 
-    (*turns_taken)++;
+    *turns_taken += 1;
     apply_gameplay_move(
         board,
         player_row,
@@ -898,7 +898,7 @@ int prepare_driving_turn(
         return 0;
     }
 
-    (*turns_taken)++;
+    *turns_taken += 1;
     apply_gameplay_move(board, player_row, player_col, score,
         step_count, coins_collected, last_move_used_tunnel, command);
     return 1;
@@ -989,7 +989,7 @@ int handle_move_and_pre_scroll_checks(
         return 0;
     }
 
-    (*turns_taken)++;
+    *turns_taken += 1;
     apply_gameplay_move(board, player_row, player_col, score, step_count,
         coins_collected, last_move_used_tunnel, command);
     *successful_move = *step_count > original_step_count;
@@ -1052,8 +1052,8 @@ void initialise_scrolling_coin_map(
     struct tile board[ROWS][COLS],
     int coin_map[ROWS][COLS]
 ) {
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             coin_map[row][col] = board[row][col].entity == COIN;
         }
     }
@@ -1066,16 +1066,16 @@ void rotate_board_rows(
     struct tile bottom_row[COLS];
     int bottom_row_id = row_ids[ROWS - 1];
 
-    for (int col = 0; col < COLS; col++) {
+    for (int col = 0; col < COLS; col += 1) {
         bottom_row[col] = board[ROWS - 1][col];
     }
-    for (int row = ROWS - 1; row > 0; row--) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = ROWS - 1; row > 0; row -= 1) {
+        for (int col = 0; col < COLS; col += 1) {
             board[row][col] = board[row - 1][col];
         }
         row_ids[row] = row_ids[row - 1];
     }
-    for (int col = 0; col < COLS; col++) {
+    for (int col = 0; col < COLS; col += 1) {
         board[0][col] = bottom_row[col];
     }
     row_ids[0] = bottom_row_id;
@@ -1088,7 +1088,7 @@ void restore_top_row_coins(
 ) {
     int source_row = row_ids[0];
 
-    for (int col = 0; col < COLS; col++) {
+    for (int col = 0; col < COLS; col += 1) {
         if (coin_map[source_row][col] && board[0][col].entity == EMPTY) {
             board[0][col].entity = COIN;
         }
@@ -1177,10 +1177,10 @@ int finish_scroll_after_rotation(
     (void) row_ids;
     if (keep_player_on_top_after_scroll) {
         *player_row = 0;
-        (*step_count)++;
+        *step_count += 1;
         collect_coin(board, *player_row, player_col, score, coins_collected);
     } else {
-        (*player_row)++;
+        *player_row += 1;
     }
 
     handle_tunnel_under_player(
@@ -1410,13 +1410,13 @@ void update_destination_from_command(
     int *destination_col
 ) {
     if (command == 'w') {
-        (*destination_row)--;
+        *destination_row -= 1;
     } else if (command == 'a') {
-        (*destination_col)--;
+        *destination_col -= 1;
     } else if (command == 's') {
-        (*destination_row)++;
+        *destination_row += 1;
     } else if (command == 'd') {
-        (*destination_col)++;
+        *destination_col += 1;
     }
 }
 
@@ -1471,8 +1471,8 @@ int find_tunnel_exit(
 ) {
     int tunnel_id = board[entry_row][entry_col].tunnel_id;
 
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             if ((row != entry_row || col != entry_col)
                 && board[row][col].entity == WOMBAT_TUNNEL
                 && board[row][col].tunnel_id == tunnel_id) {
@@ -1500,7 +1500,7 @@ void collect_coin(
     if (board[player_row][player_col].entity == COIN) {
         board[player_row][player_col].entity = EMPTY;
         *score += 5;
-        (*coins_collected)++;
+        *coins_collected += 1;
     }
 }
 
@@ -1778,8 +1778,8 @@ int is_valid_car_destination(
 }
 
 void clear_headlights(struct tile board[ROWS][COLS]) {
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             if (board[row][col].entity == HEADLIGHTS) {
                 board[row][col].entity = ROAD;
             }
@@ -1790,8 +1790,8 @@ void clear_headlights(struct tile board[ROWS][COLS]) {
 void refresh_headlights(struct tile board[ROWS][COLS]) {
     clear_headlights(board);
 
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             if (board[row][col].entity == CAR_FACING_RIGHT
                 && is_position_on_board(row, col + 1)
                 && board[row][col + 1].entity == ROAD) {
@@ -1809,8 +1809,8 @@ void process_left_facing_cars(
     struct tile board[ROWS][COLS],
     int moved[ROWS][COLS]
 ) {
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             if (moved[row][col] || board[row][col].entity != CAR_FACING_LEFT) {
                 continue;
             }
@@ -1830,8 +1830,8 @@ void process_right_facing_cars(
     struct tile board[ROWS][COLS],
     int moved[ROWS][COLS]
 ) {
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = COLS - 1; col >= 0; col--) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = COLS - 1; col >= 0; col -= 1) {
             if (moved[row][col] || board[row][col].entity != CAR_FACING_RIGHT) {
                 continue;
             }
@@ -1865,7 +1865,7 @@ int can_build_road(
     int col;
 
     *deforesting = 0;
-    for (col = 0; col < COLS; col++) {
+    for (col = 0; col < COLS; col += 1) {
         if (row == player_row && col == player_col) {
             return 0;
         }
@@ -1887,7 +1887,7 @@ int can_build_road(
 void build_road(struct tile board[ROWS][COLS], int row) {
     int col;
 
-    for (col = 0; col < COLS; col++) {
+    for (col = 0; col < COLS; col += 1) {
         board[row][col].entity = ROAD;
         board[row][col].tunnel_id = INVALID_TUNNEL_ID;
     }
@@ -1935,8 +1935,8 @@ void print_welcome(void) {
 
 // Given a 2D board array, initialises all tile entities to EMPTY.
 void initialise_board(struct tile board[ROWS][COLS]) {
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             board[row][col].entity = EMPTY;
             board[row][col].tunnel_id = INVALID_TUNNEL_ID;
         }
@@ -1956,8 +1956,8 @@ void print_board(
     printf("|          C S   C H I C K E N          |\n");
     print_board_line();
 
-    for (int row = 0; row < ROWS; row++) {
-        for (int col = 0; col < COLS; col++) {
+    for (int row = 0; row < ROWS; row += 1) {
+        for (int col = 0; col < COLS; col += 1) {
             printf("|");
             if (row == player_row && col == player_col) {
                 if (is_player_shocked(board, player_row, player_col)) {
@@ -2056,7 +2056,7 @@ void print_board_footer(int curr_score, int target_score) {
 // Helper function for print_board().
 void print_board_line(void) {
     printf("+");
-    for (int col = 0; col < COLS; col++) {
+    for (int col = 0; col < COLS; col += 1) {
         printf("---+");
     }
     printf("\n");
