@@ -1722,8 +1722,7 @@ int handle_collision(
 ) {
     enum entity tile = board[player_row][player_col].entity;
 
-    if (tile != HEADLIGHTS
-        && tile != CAR_FACING_LEFT
+    if (tile != CAR_FACING_LEFT
         && tile != CAR_FACING_RIGHT) {
         return 0;
     }
