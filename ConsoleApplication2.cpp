@@ -326,6 +326,15 @@ int finish_scroll_after_rotation(
     int row_ids[ROWS],
     int keep_player_on_top_after_scroll
 );
+int handle_tunnel_under_player(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *coins_collected,
+    int *last_move_used_tunnel,
+    char command
+);
 int finish_scrolling_turn(
     struct tile board[ROWS][COLS],
     int *player_row,
@@ -1136,6 +1145,8 @@ int finish_scroll_after_rotation(
     int row_ids[ROWS],
     int keep_player_on_top_after_scroll
 ) {
+    int last_move_used_tunnel = 0;
+
     (void) coin_map;
     (void) row_ids;
     if (keep_player_on_top_after_scroll) {
@@ -1145,6 +1156,16 @@ int finish_scroll_after_rotation(
     } else {
         (*player_row)++;
     }
+
+    handle_tunnel_under_player(
+        board,
+        player_row,
+        &player_col,
+        score,
+        coins_collected,
+        &last_move_used_tunnel,
+        'w'
+    );
 
     if (handle_collision(
             board,
@@ -1169,6 +1190,38 @@ int finish_scroll_after_rotation(
         *step_count,
         *coins_collected
     );
+}
+
+int handle_tunnel_under_player(
+    struct tile board[ROWS][COLS],
+    int *player_row,
+    int *player_col,
+    int *score,
+    int *coins_collected,
+    int *last_move_used_tunnel,
+    char command
+) {
+    int original_row = *player_row;
+    int original_col = *player_col;
+
+    if (board[*player_row][*player_col].entity != WOMBAT_TUNNEL) {
+        return 0;
+    }
+
+    if (!resolve_tunnel_move(
+            board,
+            original_row,
+            original_col,
+            player_row,
+            player_col,
+            last_move_used_tunnel,
+            command
+        )) {
+        return 0;
+    }
+
+    collect_coin(board, *player_row, *player_col, score, coins_collected);
+    return 1;
 }
 
 int finish_scrolling_turn(
