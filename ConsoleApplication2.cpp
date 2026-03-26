@@ -1242,7 +1242,7 @@ int handle_tunnel_under_player(
     int original_row = *player_row;
     int original_col = *player_col;
 
-    if (board[* player_row][* player_col].entity != WOMBAT_TUNNEL) {
+    if (board[original_row][original_col].entity != WOMBAT_TUNNEL) {
         return 0;
     }
 
