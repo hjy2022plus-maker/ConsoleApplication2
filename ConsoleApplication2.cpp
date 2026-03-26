@@ -434,6 +434,18 @@ int is_player_shocked(
     int player_row,
     int player_col
 );
+void print_player_tile(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+);
+void print_board_tile(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int row,
+    int col
+);
 int handle_collision(
     struct tile board[ROWS][COLS],
     int player_row,
@@ -1230,7 +1242,7 @@ int handle_tunnel_under_player(
     int original_row = *player_row;
     int original_col = *player_col;
 
-    if (board[*player_row][*player_col].entity != WOMBAT_TUNNEL) {
+    if (board[* player_row][* player_col].entity != WOMBAT_TUNNEL) {
         return 0;
     }
 
@@ -1732,6 +1744,48 @@ int is_player_shocked(
     return is_shocking_player_tile(board[player_row][player_col].entity);
 }
 
+void print_player_tile(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col
+) {
+    if (is_player_shocked(board, player_row, player_col)) {
+        printf("0_0");
+    } else {
+        printf("^_^");
+    }
+}
+
+void print_board_tile(
+    struct tile board[ROWS][COLS],
+    int player_row,
+    int player_col,
+    int row,
+    int col
+) {
+    if (row == player_row && col == player_col) {
+        print_player_tile(board, player_row, player_col);
+    } else if (board[row][col].entity == WOMBAT_TUNNEL) {
+        printf("(%d)", board[row][col].tunnel_id);
+    } else if (board[row][col].entity == EMPTY) {
+        printf("   ");
+    } else if (board[row][col].entity == COIN) {
+        printf(" c ");
+    } else if (board[row][col].entity == TREE) {
+        printf(" T ");
+    } else if (board[row][col].entity == ROAD) {
+        printf("___");
+    } else if (board[row][col].entity == CAR_FACING_RIGHT) {
+        printf("[_0");
+    } else if (board[row][col].entity == CAR_FACING_LEFT) {
+        printf("0_]");
+    } else if (board[row][col].entity == HEADLIGHTS) {
+        printf("###");
+    } else {
+        printf("   ");
+    }
+}
+
 int is_shocking_player_tile(enum entity tile) {
     return tile == HEADLIGHTS
         || tile == CAR_FACING_LEFT
@@ -1959,31 +2013,7 @@ void print_board(
     for (int row = 0; row < ROWS; row += 1) {
         for (int col = 0; col < COLS; col += 1) {
             printf("|");
-            if (row == player_row && col == player_col) {
-                if (is_player_shocked(board, player_row, player_col)) {
-                    printf("0_0");
-                } else {
-                    printf("^_^");
-                }
-            } else if (board[row][col].entity == WOMBAT_TUNNEL) {
-                printf("(%d)", board[row][col].tunnel_id);
-            } else if (board[row][col].entity == EMPTY) {
-                printf("   ");
-            } else if (board[row][col].entity == COIN) {
-                printf(" c ");
-            } else if (board[row][col].entity == TREE) {
-                printf(" T ");
-            } else if (board[row][col].entity == ROAD) {
-                printf("___");
-            } else if (board[row][col].entity == CAR_FACING_RIGHT) {
-                printf("[_0");
-            } else if (board[row][col].entity == CAR_FACING_LEFT) {
-                printf("0_]");
-            } else if (board[row][col].entity == HEADLIGHTS) {
-                printf("###");
-            } else {
-                printf("   ");
-            }
+            print_board_tile(board, player_row, player_col, row, col);
         }
         printf("|\n");
         print_board_line();

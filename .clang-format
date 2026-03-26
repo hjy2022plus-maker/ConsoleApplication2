@@ -1,0 +1,10 @@
+BasedOnStyle: Google
+IndentWidth: 4
+
+
+SpaceBeforeAssignmentOperators: true
+
+
+SpacesInParentheses: false
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: ControlStatements
